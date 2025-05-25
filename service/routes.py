@@ -99,7 +99,38 @@ def create_products():
 ######################################################################
 
 #
-# PLACE YOUR CODE TO LIST ALL PRODUCTS HERE
+@app.route("/products", methods=["GET"])
+def list_products():
+    """
+    Returns a list of Products, optionally filtered by name, category, or availability
+    """
+    app.logger.info("Request to list Products...")
+
+    name = request.args.get("name")
+    category = request.args.get("category")
+    available = request.args.get("available")
+
+    if name:
+        products = Product.find_by_name(name)
+    elif category:
+        try:
+            category_enum = Category[category.upper()]
+        except KeyError:
+            abort(status.HTTP_400_BAD_REQUEST, f"Invalid category: {category}")
+        products = Product.find_by_category(category_enum)
+    elif available is not None:
+        if available.lower() in ["true", "1"]:
+            products = Product.find_by_availability(True)
+        elif available.lower() in ["false", "0"]:
+            products = Product.find_by_availability(False)
+        else:
+            abort(status.HTTP_400_BAD_REQUEST, "Available must be 'true' or 'false'")
+    else:
+        products = Product.all()
+
+    results = [product.serialize() for product in products]
+    app.logger.info("[%s] Products returned", len(results))
+    return results, status.HTTP_200_OK
 #
 
 ######################################################################
@@ -107,7 +138,20 @@ def create_products():
 ######################################################################
 
 #
-# PLACE YOUR CODE HERE TO READ A PRODUCT
+@app.route("/products/<int:product_id>", methods=["GET"])
+def get_products(product_id):
+    """
+    Retrieve a single Product
+    This endpoint will return a Product based on its id
+    """
+    app.logger.info("Request to Retrieve a product with id [%s]", product_id)
+
+    product = Product.find(product_id)
+    if not product:
+        app.logger.warning("Product with id [%s] was not found.", product_id)
+        abort(status.HTTP_404_NOT_FOUND, f"Product with id '{product_id}' was not found.")
+
+    return jsonify(product.serialize()), status.HTTP_200_OK
 #
 
 ######################################################################
@@ -115,7 +159,23 @@ def create_products():
 ######################################################################
 
 #
-# PLACE YOUR CODE TO UPDATE A PRODUCT HERE
+@app.route("/products/<int:product_id>", methods=["PUT"])
+def update_products(product_id):
+    """
+    Update a Product
+    """
+    app.logger.info("Request to update product with id [%s]", product_id)
+    check_content_type("application/json")
+
+    product = Product.find(product_id)
+    if not product:
+        abort(status.HTTP_404_NOT_FOUND, f"Product with id [{product_id}] not found.")
+
+    product.deserialize(request.get_json())
+    product.update()
+
+    return product.serialize(), status.HTTP_200_OK
+
 #
 
 ######################################################################
@@ -124,5 +184,17 @@ def create_products():
 
 
 #
-# PLACE YOUR CODE TO DELETE A PRODUCT HERE
+@app.route("/products/<int:product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    """
+    Delete a Product
+    """
+    app.logger.info("Request to delete product with id [%s]", product_id)
+
+    product = Product.find(product_id)
+    if product:
+        product.delete()
+
+    return "", status.HTTP_204_NO_CONTENT
+
 #
